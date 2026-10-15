@@ -1,0 +1,7 @@
+{
+  "name": "tugas1-restful",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix restful-api-app run dev"
+  }
+}
