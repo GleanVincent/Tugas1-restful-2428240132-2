@@ -3,6 +3,7 @@ const router = express.Router();
 const apotekControllers = require("../controllers/apotekController");
 const cekApiKey = require("../middlewares/CekApiKey");
 
+
 router.get("/", apotekControllers.getAll);
 router.get("/:id", apotekControllers.getById);
 router.post("/", cekApiKey, apotekControllers.create);

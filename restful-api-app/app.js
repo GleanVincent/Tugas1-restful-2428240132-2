@@ -9,11 +9,15 @@ const logger = require("./middlewares/logger");
 const { notFoundHandler, errorHandler } = require("./middlewares/errorHandler");
 
 const apotekRoutes = require("./routes/apotekRoutes");
+const mongoose = require("mongoose"); // tambahkan di antara require lainnya
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const pemasokRoutes = require('./routes/pemasokRoutes');   // bersama require lainnya
+
 // ---------- Middleware global ----------
+
 app.use(logger);
 const allowedOrigins = [
   process.env.CORS_ORIGIN,
@@ -47,11 +51,23 @@ app.get("/", (req, res) => {
 
 // ---------- Route per modul ----------
 app.use("/Medicines", apotekRoutes);
+app.use('/Pemasok', pemasokRoutes);                          // di bawah app.use('/mahasiswa', ...)
 
 // ---------- Handler 404 dan error handler (paling bawah) ----------
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
-});
+mongoose
+  .connect(process.env.DB_URI)
+  .then(() => {
+    console.log("Terhubung ke MongoDB");
+    app.listen(PORT, () =>
+      console.log(`Server berjalan di http://localhost:${PORT}`),
+    );
+  })
+  .catch((err) => {
+    console.error("Gagal terhubung:", err.message);
+    process.exit(1);
+  });
+
+  

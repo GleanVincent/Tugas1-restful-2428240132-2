@@ -2,6 +2,7 @@
   "name": "tugas1-restful",
   "private": true,
   "scripts": {
-    "dev": "npm --prefix restful-api-app run dev"
+    "dev": "npm --prefix restful-api-app run dev",
+    "seed": "npm --prefix restful-api-app run seed"
   }
 }
