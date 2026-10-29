@@ -1,5 +1,18 @@
 const Obat = require("../models/apotekModels");
 const { errorHttp } = require("../middlewares/errorHandler");
+const Pemasok = require("../models/pemasokModels");
+const FIELD_SORT = ["nama", "createdAt"];
+const FIELD_BOLEH_DIPILIH = ["nama", "pemasokId", "createdAt"];
+
+const LIMIT_DEFAULT = 10;
+const LIMIT_MAKS = 50;
+
+// Mengubah bilangan dari query string menjadi bilangan bulat yang aman
+function angkaAman(nilai, bawaan, min, maks) {
+  const n = parseInt(nilai, 10);
+  if (Number.isNaN(n)) return bawaan;
+  return Math.min(Math.max(n, min), maks);
+}
 
 exports.create = async (req, res) => {
   try {
@@ -12,36 +25,53 @@ exports.create = async (req, res) => {
 };
 
 exports.getAll = async (req, res) => {
-  const rawPage = req.query.page ?? "1";
-  const rawLimit = req.query.limit ?? "10";
-
-  if (typeof rawPage !== "string" || typeof rawLimit !== "string") {
-    throw errorHttp(400, "page dan limit harus berupa bilangan bulat positif");
+  const filter = {};
+  if (req.query.nama) {
+    filter["pemasokId.nama"] = String(req.query.nama);
+  }
+  if (req.query.prodi) {
+    const prodi = await Prodi.findOne({
+      kode: String(req.query.prodi).toUpperCase(),
+    });
+    filter.prodiId = prodi ? prodi._id : { $in: [] };
   }
 
-  const page = Number(rawPage);
-  const limit = Number(rawLimit);
-
-  if (!Number.isInteger(page) || page < 1 || !Number.isInteger(limit) || limit < 1) {
-    throw errorHttp(400, "page dan limit harus berupa bilangan bulat positif");
+  const page = angkaAman(req.query.page, 1, 1, Number.MAX_SAFE_INTEGER);
+  const limit = angkaAman(req.query.limit, LIMIT_DEFAULT, 1, LIMIT_MAKS);
+  // Sorting: ?sort=nama (naik) atau ?sort=-nama (turun). Bawaan: terbaru dulu
+  const sortParam = String(req.query.sort || "-createdAt");
+  const arah = sortParam.startsWith("-") ? -1 : 1;
+  const sortField = sortParam.replace(/^-/, "");
+  if (!FIELD_SORT.includes(sortField)) {
+    throw errorHttp(400, `sort hanya boleh: ${FIELD_SORT.join(", ")}`);
+  }
+  // Projection: ?fields=nama,nim
+  let select = "";
+  if (req.query.fields) {
+    const fields = String(req.query.fields)
+      .split(",")
+      .map((f) => f.trim());
+    if (!fields.every((f) => FIELD_BOLEH_DIPILIH.includes(f))) {
+      throw errorHttp(
+        400,
+        `fields hanya boleh: ${FIELD_BOLEH_DIPILIH.join(", ")}`,
+      );
+    }
+    select = fields.join(" ");
+  }
+  const query = Obat.find(filter)
+    .select(select)
+    .sort({ [sortField]: arah, _id: 1 })
+    .skip((page - 1) * limit)
+    .limit(limit);
+  if (!select || select.split(" ").includes("pemasokId")) {
+    query.populate("pemasokId", "kode nama");
   }
 
-  const [total, data] = await Promise.all([
-    Obat.countDocuments(),
-    Obat.find()
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate("pemasokId", "kode nama"),
-  ]);
+  const [data, total] = await Promise.all([query, Obat.countDocuments(filter)]);
 
-  res.json({
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-    data,
-  });
-};
+  res.json({ data, page, limit, total, totalPages: Math.ceil(total / limit) });
+};;;
 
 exports.getById = async (req, res) => {
   const data = await Obat.findById(req.params.id).populate("pemasokId", "kode nama");
